@@ -1,70 +1,29 @@
-// Tiny stack VM for make.fun's ISA v1: runs /input/<id>/program.bin on input.bin, writes stdout.bin and exit.txt.
-import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
-
-// Per opcode: immediate bytes, values popped, net stack change. Missing entries are unknown opcodes.
-const SPEC: Record<number, [number, number, number]> = {
-  0: [0, 0, 0], 1: [1, 0, 1], 2: [4, 0, 1], 3: [0, 1, -1], 4: [0, 1, 1], 5: [0, 2, 0], 6: [0, 2, 1], 7: [0, 3, 0],
-  0x30: [2, 0, 0], 0x31: [2, 1, -1], 0x32: [2, 1, -1], 0x33: [2, 0, 0], 0x34: [0, 0, 0],
-  0x40: [0, 1, 0], 0x41: [0, 2, -2], 0x50: [0, 1, -1], 0x51: [0, 1, -1], 0x52: [0, 0, 1], 0x53: [0, 1, -1],
-};
-for (let o = 0x10; o < 0x23; o++) if (o != 0x1f) SPEC[o] = o == 0x17 || o == 0x1b ? [0, 1, 0] : [0, 2, -1];
-
-function run(p: Buffer, input: Buffer): [Buffer, number] {
-  const D = new Int32Array(256), M = new Int32Array(256), C: number[] = [], out: number[] = [];
-  let sp = 0, pc = 0, ip = 0;
-  for (let steps = 0; ; steps++) {
-    const done = (code: number): [Buffer, number] => [Buffer.from(out), code];
-    if (steps == 1e6) return done(10);
-    if (pc < 0 || pc >= p.length) return done(9);
-    const op = p[pc], s = SPEC[op];
-    if (!s) return done(5);
-    const [imm, pops, net] = s;
-    if (pc + imm >= p.length) return done(9);
-    if (sp < pops) return done(2);
-    if (sp + net > 256) return done(3);
-    const next = pc + 1 + imm;
-    pc = next;
-    const b = D[sp - 1], a = D[sp - 2];
-    if (op >= 0x10 && op < 0x23) {
-      if (op >= 0x13 && op <= 0x16 && b == 0) return done(4);
-      const ua = a >>> 0, ub = b >>> 0;
-      const r = [a + b, a - b, Math.imul(a, b), a / b, a % b, ua / ub, ua % ub, -b, a & b, a | b, a ^ b, ~b,
-        a << b, a >> b, a >>> b, 0, +(a == b), +(a < b), +(ua < ub)][op - 0x10];
-      sp += net;
-      D[sp - 1] = r;
-      continue;
-    }
-    switch (op) {
-      case 0: return done(0);
-      case 1: D[sp++] = p.readInt8(pc - 1); break;
-      case 2: D[sp++] = p.readInt32LE(pc - 4); break;
-      case 3: sp--; break;
-      case 4: D[sp++] = b; break;
-      case 5: D[sp - 1] = a; D[sp - 2] = b; break;
-      case 6: D[sp++] = a; break;
-      case 7: { const x = D[sp - 3]; D[sp - 3] = a; D[sp - 2] = b; D[sp - 1] = x; break; }
-      case 0x30: pc += p.readInt16LE(pc - 2); break;
-      case 0x31: if (D[--sp] == 0) pc += p.readInt16LE(pc - 2); break;
-      case 0x32: if (D[--sp] != 0) pc += p.readInt16LE(pc - 2); break;
-      case 0x33: if (C.length == 64) return done(7); C.push(pc); pc = p.readUInt16LE(pc - 2); break;
-      case 0x34: if (!C.length) return done(8); pc = C.pop()!; break;
-      case 0x40: if (b >>> 8) return done(6); D[sp - 1] = M[b]; break;
-      case 0x41: if (b >>> 8) return done(6); M[b] = a; sp -= 2; break;
-      case 0x50: case 0x51: {
-        const bytes = op == 0x51 ? [b & 255] : [...Buffer.from('' + b)];
-        if (out.length + bytes.length > 65536) return done(11);
-        out.push(...bytes); sp--; break;
-      }
-      case 0x52: D[sp++] = ip < input.length ? input[ip++] : -1; break;
-      case 0x53: return done(b & 255);
-    }
-  }
-}
-
-const I = '/input/', O = '/output/';
-for (const id of readdirSync(I)) {
-  const [stdout, code] = run(readFileSync(I + id + '/program.bin'), readFileSync(I + id + '/input.bin'));
-  mkdirSync(O + id, { recursive: true });
-  writeFileSync(O + id + '/stdout.bin', stdout);
-  writeFileSync(O + id + '/exit.txt', '' + code);
-}
+f=require('fs')
+B=Buffer('DHTEEFFG        FFFFFFFEFFFEFFF FFF             LMMLD           EF              EEDE')
+D=new Int32Array(256)
+X=_=>{try{for(c=0;t++<1e6;){if(!((v=B[k=p.readUInt8(c)])>>6))return 5
+m=(p.readIntLE(c,n=v>>2&7)-k)/256;c+=n
+if(s<(v&3))return 2
+x=D[s-=v&3];y=D[s+1];z=D[s+2]
+switch(k){case 0:return 0
+case 1:case 2:D[s++]=m;break
+case 6:z=y;y=x
+case 7:D[s++]=y;D[s++]=z;D[s++]=x;break
+case 4:y=x
+case 5:D[s++]=y;D[s++]=x;break
+case 49:x=!x
+case 50:if(!x)break
+case 48:c+=m;break
+case 51:if(C[63])return 7;C.push(c);c=m&65535;break
+case 52:if(!(c=C.pop()))return 8;break
+case 64:if(x>>>8)return 6;D[s++]=M[x];break
+case 65:if(y>>>8)return 6;M[y]=x;case 3:break
+case 80:x=''+x
+case 81:if((w=u+(k>80?String.fromCharCode(x):x))[65536])return 11;u=w;break
+case 82:D[s++]=q[j++]??-1;break
+case 83:return x&255
+default:if(k>18&k<23&!y)return 4
+D[s++]=[x+y,x-y,Math.imul(x,y),x/y,x%y,(x>>>0)/(y>>>0),(x>>>0)%(y>>>0),-x,x&y,x|y,x^y,~x,x<<y,x>>y,x>>>y,0,x==y,x<y,x>>>0<y>>>0][k-16]}
+if(s>256)return 3}return 10}catch{return 9}}
+for(d of f.readdirSync(I='/input/')){p=f.readFileSync(I+d+'/program.bin');q=f.readFileSync(I+d+'/input.bin');M=[];C=[];u='';s=t=j=0
+e=X();f.mkdirSync(O='/output/'+d);f.writeFileSync(O+'/stdout.bin',u,'latin1');f.writeFileSync(O+'/exit.txt',''+e)}
