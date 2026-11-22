@@ -14,4 +14,4 @@ if(k>>1==32){if((k&1?b:a)>>8)throw 6;k&1?M[y]=x:r=[M[x]]}
 if(k>>1==40){if((w=u+(k&1?String.fromCharCode(x):x))[65536])throw 11;u=w}
 if(k==82)r=[q[j++]??-1]
 if(k%83<1)throw k&&x&255
-D.set(r,s);s+=r.length}throw 10}catch(e){W(O+'/exit.txt',(e>=0?e:v>>6?e.code?9:3:5)+'')}W(O+'/stdout.bin',u,'ascii')}
+D.set(r,s);s+=r.length}throw 10}catch(e){W(O+'/exit.txt',(e>=0?e:n%7?e.code?9:3:5)+'')}W(O+'/stdout.bin',u,'ascii')}
